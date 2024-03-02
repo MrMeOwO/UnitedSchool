@@ -23,15 +23,19 @@ class ImageGenerator:
         draw.rectangle(((0, 0), self.lesson_block_size), fill=self.bg_color, outline=self.outline_color, width=2)
 
         draw.text((10, 18), lesson, self.text_color, font=self.medium_font)
-        draw.text((18 + xsize, 14), teacher, self.text_color, font=self.small_font)
+        # draw.text((18 + xsize, 14), teacher, self.text_color, font=self.small_font)
         draw.text((18 + xsize, 34), cab, self.text_color, font=self.small_font)
         return img
 
-    def gen_day(self, lessons: list[Image]):
+    def gen_day(self, lessons: list[Image], lessons_in_day: int):
         img = Image.new("RGB",
-                        (self.lesson_block_size_x, self.lesson_block_size_y * len(lessons)),
+                        (self.lesson_block_size_x, self.lesson_block_size_y * lessons_in_day),
                         self.bg_color)
 
+        if len(lessons) < lessons_in_day:
+            empty_lesson = self.gen_lesson("", "", "")
+            for i in range(lessons_in_day-len(lessons)):
+                lessons.append(empty_lesson)
         for index, lesson in enumerate(lessons):
             img.paste(lesson, (0, self.lesson_block_size_y * index))
 
@@ -66,13 +70,50 @@ class ImageGenerator:
                       font=self.large_font, fill=self.text_color, anchor="mm")
         return new_img
 
-    def generate(self, class_data):
+    def add_caption(self, img: Image, caption: str) -> Image:
+        new_image = Image.new("RGB", (img.size[0], img.size[1]+60), self.bg_color)
+        new_image.paste(img, (0, 60))
+        draw = ImageDraw.Draw(new_image)
+        draw.text((img.size[0]/2, 30), caption, self.text_color, self.large_font, anchor="mm")
+        return new_image
+
+    def generate(self, class_data, caption):
         week = []
+        max_lessons_in_day = 1
+        for day_data in class_data:
+            if len(day_data) >= max_lessons_in_day:
+                max_lessons_in_day = len(day_data)
+
         for day_data in class_data:
             day = []
             for i in day_data:
                 if len(i) > 4:
-                    continue
+                    i = [i[0], i[1]+" / "+i[2], i[3]+" / "+i[4]]
                 day.append(self.gen_lesson(*i))
-            week.append(self.gen_day(day))
-        return self.add_lesson_numbers(self.gen_week(week))
+            if day:
+                week.append(self.gen_day(day, max_lessons_in_day))
+        return self.add_caption(
+            self.add_lesson_numbers(
+                self.gen_week(
+                    week, max_lessons_in_day
+                ),
+                max_lessons_in_day
+            ),
+            caption)
+
+    def stack_images(self, data: list[Image]) -> Image:
+        prev = Image.new("RGB", (0, 0), color=self.bg_color)
+        for index, img in enumerate(data):
+
+            size = [0, 0]
+            if img.size[0] > prev.size[0]:
+                size[0] = img.size[0]
+            else:
+                size[0] = prev.size[0]
+            size[1] = img.size[1] + prev.size[1]
+            past_pose = (0, prev.size[1])
+            temp = prev
+            prev = Image.new("RGB", size, color=self.bg_color)
+            prev.paste(temp, (0, 0))
+            prev.paste(img, past_pose)
+        return prev
