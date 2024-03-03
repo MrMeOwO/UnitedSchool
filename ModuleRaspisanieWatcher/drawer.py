@@ -1,4 +1,5 @@
 from PIL import ImageFont, Image, ImageDraw
+from .parser import RaspisanieClass, Day, Lesson
 
 
 class ImageGenerator:
@@ -11,31 +12,70 @@ class ImageGenerator:
     outline_color = (0, 0, 0)
 
     def __init__(self):
-        self.small_font = ImageFont.truetype("/usr/share/fonts/gsfonts/NimbusSans-Regular.otf", 18)
-        self.medium_font = ImageFont.truetype("/usr/share/fonts/gsfonts/NimbusSans-Regular.otf", 30)
-        self.large_font = ImageFont.truetype("/usr/share/fonts/gsfonts/NimbusSans-Regular.otf", 50)
+        self.small_font = ImageFont.truetype("NimbusSans-Regular.otf", 18)
+        self.medium_font = ImageFont.truetype("NimbusSans-Regular.otf", 40)
+        self.large_font = ImageFont.truetype("NimbusSans-Regular.otf", 50)
 
-    def gen_lesson(self, lesson, teacher, cab):
+    def gen_lesson(self, lesson: Lesson, disable_teachers: bool = False):
         img = Image.new("RGB", self.lesson_block_size, self.bg_color)
         draw = ImageDraw.Draw(img)
 
-        xsize = round(self.medium_font.getlength(lesson))  # y = 22 if font size is 30
+        replace_data = {
+                "Физическая культура": "Физ-ра",
+                "Изобразительное искусство": "ИЗО",
+                "Основы безопасности жизнедеятельности": "ОБЖ",
+                "Вероятность и статистика": "Вероятн",
+                "Россия мои горизонты": "Россия",
+                "Ввведение в новейшую историю России": "Нов. история",
+                "Проектная и иссследовательская деятельность": "ПИД",
+                "Практикум по геометрии": "Практик",
+
+                "Введение в профессию":"Вед.прф",
+                "Искусство устной и письменной речи":"Иск.реч",
+                "Подготовка к ЕГЭ по химии":"ЕГЭ хим",
+                "Индивидуальный проект":"Инд.прк",
+                "Человек-общество-мир":"Чел.общ",
+                "Психология человека":"Психология",
+                "Функции помогают уравнеиям":"фун.ур",
+                "Подготовка к ЕГЭ по инфлрматике":"ЕГЭ информатика",
+                "Практикум по биологии":"Пр.биол"
+            }
+
+        if lesson.name in replace_data.keys():
+            lesson.name = replace_data[lesson.name]
+
+        # TODO: replace hotfix with normal fix
+        if "Некрылова" in lesson.cabinet:
+            lesson.cabinet = ""
+            print("WARN: Некрылова detected!!!")
+
+        if type(lesson.teacher) is list:
+            lesson.teacher = lesson.teacher[0] + "/" + lesson.teacher[1]
+
+        if type(lesson.cabinet) is list:
+            lesson.cabinet = lesson.cabinet[0] + "/" + lesson.cabinet[1]
+
+        if disable_teachers:
+            lesson.teacher = ""
+
+        if lesson.name == "empty":
+            lesson.name = ""
+            lesson.cabinet = ""
+            lesson.teacher = ""
+
+        xsize = round(self.medium_font.getlength(lesson.name))  # y = 22 if font size is 30
         draw.rectangle(((0, 0), self.lesson_block_size), fill=self.bg_color, outline=self.outline_color, width=2)
 
-        draw.text((10, 18), lesson, self.text_color, font=self.medium_font)
-        # draw.text((18 + xsize, 14), teacher, self.text_color, font=self.small_font)
-        draw.text((18 + xsize, 34), cab, self.text_color, font=self.small_font)
+        draw.text((10, self.lesson_block_size_y//2), lesson.name, self.text_color, font=self.medium_font, anchor="lm")
+        draw.text((18 + xsize, 14), lesson.teacher, self.text_color, font=self.small_font)
+        draw.text((18 + xsize, 34), lesson.cabinet, self.text_color, font=self.small_font)
         return img
 
-    def gen_day(self, lessons: list[Image], lessons_in_day: int):
+    def gen_day(self, lessons: list[Image]):
         img = Image.new("RGB",
-                        (self.lesson_block_size_x, self.lesson_block_size_y * lessons_in_day),
+                        (self.lesson_block_size_x, self.lesson_block_size_y * len(lessons)),
                         self.bg_color)
 
-        if len(lessons) < lessons_in_day:
-            empty_lesson = self.gen_lesson("", "", "")
-            for i in range(lessons_in_day-len(lessons)):
-                lessons.append(empty_lesson)
         for index, lesson in enumerate(lessons):
             img.paste(lesson, (0, self.lesson_block_size_y * index))
 
@@ -51,7 +91,7 @@ class ImageGenerator:
 
         return img
 
-    def add_lesson_numbers(self, image: Image, lessons_in_day=8):
+    def add_lesson_numbers(self, image: Image, start: int, end: int):
         x, y = image.size
         new_img = Image.new("RGB",
                             (x + self.lesson_block_size_y, y),
@@ -60,13 +100,13 @@ class ImageGenerator:
         new_img.paste(image, (self.lesson_block_size_y, 0))
         draw = ImageDraw.Draw(new_img)
 
-        for i in range(lessons_in_day):
+        for i in range(start-1, end+1):
             draw.rectangle((
-                    (0, self.lesson_block_size_y * i),
-                    (self.lesson_block_size_y, self.lesson_block_size_y * i + self.lesson_block_size_y)
+                    (0, self.lesson_block_size_y * (i-start)),
+                    (self.lesson_block_size_y, self.lesson_block_size_y * (i-start) + self.lesson_block_size_y)
                 ),
                 fill=self.bg_color, outline=self.outline_color, width=2)
-            draw.text((30, self.lesson_block_size_y * i + 35), str(i + 1),
+            draw.text((30, self.lesson_block_size_y * (i-start) + 35), str(i),
                       font=self.large_font, fill=self.text_color, anchor="mm")
         return new_img
 
@@ -77,29 +117,14 @@ class ImageGenerator:
         draw.text((img.size[0]/2, 30), caption, self.text_color, self.large_font, anchor="mm")
         return new_image
 
-    def generate(self, class_data, caption):
-        week = []
-        max_lessons_in_day = 1
-        for day_data in class_data:
-            if len(day_data) >= max_lessons_in_day:
-                max_lessons_in_day = len(day_data)
-
-        for day_data in class_data:
-            day = []
-            for i in day_data:
-                if len(i) > 4:
-                    i = [i[0], i[1]+" / "+i[2], i[3]+" / "+i[4]]
-                day.append(self.gen_lesson(*i))
-            if day:
-                week.append(self.gen_day(day, max_lessons_in_day))
-        return self.add_caption(
-            self.add_lesson_numbers(
-                self.gen_week(
-                    week, max_lessons_in_day
-                ),
-                max_lessons_in_day
-            ),
-            caption)
+    def generate(self, class_data: RaspisanieClass):
+        days_img = []
+        for day in class_data.days:
+            lessons_img = []
+            for lesson in day.lessons:
+                lessons_img.append(self.gen_lesson(lesson, True))
+            days_img.append(self.gen_day(lessons_img))
+        return self.add_caption(self.add_lesson_numbers(self.gen_week(days_img, len(class_data.days[0].lessons)), class_data.start_lesson, class_data.start_lesson+len(class_data.days[0].lessons)), class_data.class_name)
 
     def stack_images(self, data: list[Image]) -> Image:
         prev = Image.new("RGB", (0, 0), color=self.bg_color)
