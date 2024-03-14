@@ -1,2 +1,2 @@
-* [Презентация проекта](https://github.com/MrMeOwO/UnitedSchool/raw/master/bureaucracy/presentation.odp)
+* [Презентация проекта](https://github.com/MrMeOwO/UnitedSchool/raw/master/bureaucracy/presentation.pptx)
 * [Согласие на обработку персональных данных](https://github.com/MrMeOwO/UnitedSchool/raw/master/bureaucracy/soglasie.pdf)
